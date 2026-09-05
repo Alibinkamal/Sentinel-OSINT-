@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sentinel OSINT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --ink:#070A11;--bg:#0A0E17;--panel:#101826;--panel-2:#152134;--panel-3:#1B2A41;
+    --line:#20304a;--line-2:#2b3f5e;--tx-1:#E8EEF7;--tx-2:#9AA9C1;--tx-3:#647289;
+    --accent:#33C1E3;--accent-2:#1E90B5;--accent-soft:rgba(51,193,227,.12);--accent-line:rgba(51,193,227,.30);
+    --ok:#3DBE6B;--low:#E0B341;--med:#E8883C;--crit:#E5484D;
+    --ok-soft:rgba(61,190,107,.13);--low-soft:rgba(224,179,65,.14);--med-soft:rgba(232,136,60,.14);--crit-soft:rgba(229,72,77,.14);
+    --radius:12px;--radius-sm:8px;--shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 28px rgba(0,0,0,.45);
+    --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --display:"Archivo",var(--sans);--mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--tx-1);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;
+    background-image:radial-gradient(900px 500px at 82% -8%,rgba(51,193,227,.10),transparent 60%),radial-gradient(700px 500px at 8% 108%,rgba(51,193,227,.05),transparent 55%),linear-gradient(rgba(255,255,255,.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.014) 1px,transparent 1px);
+    background-size:auto,auto,34px 34px,34px 34px;}
+  ::selection{background:var(--accent-soft);color:#fff}
+  a{color:var(--accent);text-decoration:none}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+  [hidden]{display:none!important}
+  button{font-family:inherit}
+
+  /* ---------- Login ---------- */
+  .login-screen{position:fixed;inset:0;display:grid;place-items:center;z-index:100;background:radial-gradient(1000px 600px at 50% -10%,rgba(51,193,227,.10),transparent 60%),var(--bg)}
+  .login-card{width:370px;max-width:92vw;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:30px 28px}
+  .login-brand{display:flex;align-items:center;gap:11px;justify-content:center;margin-bottom:6px}
+  .login-brand .name{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:.02em}
+  .login-sub{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--tx-3);margin-bottom:24px}
+  .login-card label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx-3);margin:14px 0 6px}
+  .login-card input{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:9px;padding:11px 13px;color:var(--tx-1);font-family:var(--mono);font-size:13px}
+  .login-card input:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft);outline:none}
+  .login-card button{width:100%;margin-top:22px;background:linear-gradient(180deg,var(--accent),var(--accent-2));border:none;color:#04121a;font-weight:700;padding:12px;border-radius:9px;cursor:pointer;font-size:14px}
+  .login-card button:hover{filter:brightness(1.06)}
+  .login-hint{text-align:center;color:var(--tx-3);font-size:11.5px;margin-top:16px}
+  .login-hint code{font-family:var(--mono);color:var(--tx-2);background:var(--ink);padding:2px 6px;border-radius:5px}
+  .login-err{color:var(--crit);font-size:12px;text-align:center;margin-top:12px;min-height:16px}
+
+  /* ---------- App frame ---------- */
+  .app{display:grid;grid-template-columns:238px 1fr;min-height:100vh}
+  .sidebar{border-right:1px solid var(--line);background:linear-gradient(180deg,var(--ink),#0A0F19);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:11px;padding:18px 18px 16px;border-bottom:1px solid var(--line)}
+  .brand .name{font-family:var(--display);font-weight:800;font-size:16px;letter-spacing:.02em}
+  .brand .sub{font-family:var(--mono);font-size:9.5px;color:var(--tx-3);letter-spacing:.24em;text-transform:uppercase;margin-top:1px}
+  .nav{padding:12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+  .nav .grouplbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--tx-3);padding:14px 10px 6px}
+  .nav button{all:unset;display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--tx-2);font-weight:500;font-size:13px;transition:.14s;position:relative}
+  .nav button svg{width:17px;height:17px;flex:0 0 auto;opacity:.8}
+  .nav button:hover{background:var(--panel);color:var(--tx-1)}
+  .nav button.active{background:var(--accent-soft);color:#fff}
+  .nav button.active svg{opacity:1;color:var(--accent)}
+  .nav button.active::before{content:"";position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--accent)}
+  .nav .count{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--tx-3)}
+  .sidefoot{margin-top:auto;padding:14px 16px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .sidefoot .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+  .sidefoot .m{font-family:var(--mono);font-size:10.5px;color:var(--tx-2)}
+  .sidefoot .m b{color:var(--tx-1);font-weight:600}
+
+  .main{display:flex;flex-direction:column;min-width:0}
+  .topbar{display:flex;align-items:center;gap:16px;padding:12px 22px;border-bottom:1px solid var(--line);background:rgba(10,14,23,.72);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20}
+  .search{position:relative;flex:1;max-width:620px}
+  .search .ic{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--tx-3);width:16px;height:16px}
+  .search input{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 130px 10px 38px;color:var(--tx-1);font-family:var(--mono);font-size:13px}
+  .search input::placeholder{color:var(--tx-3);font-family:var(--sans)}
+  .search input:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft);outline:none}
+  .search .detect{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);color:var(--tx-3)}
+  .search .detect b{color:var(--accent);font-weight:600}
+  .topbar .spacer{flex:1}
+  .tb-btn{all:unset;display:inline-flex;align-items:center;gap:7px;cursor:pointer;padding:8px 13px;border-radius:9px;border:1px solid var(--line);color:var(--tx-2);font-size:12.5px;font-weight:500;background:var(--panel);transition:.14s}
+  .tb-btn:hover{border-color:var(--line-2);color:var(--tx-1)}
+  .tb-btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-2));border:none;color:#04121a;font-weight:700}
+  .tb-btn svg{width:15px;height:15px}
+  .avatar{width:34px;height:34px;border-radius:9px;flex:0 0 auto;background:linear-gradient(135deg,#20344e,#122036);border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:12px;cursor:pointer}
+
+  .content{padding:24px 26px 60px;max-width:1360px;width:100%}
+  .view[hidden]{display:none}
+  .pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:20px;flex-wrap:wrap}
+  .pagehead .h{font-family:var(--display);font-weight:700;font-size:23px;letter-spacing:-.01em}
+  .pagehead .h .thin{color:var(--tx-3);font-weight:500}
+  .pagehead p{margin:5px 0 0;color:var(--tx-2);font-size:13px;max-width:64ch}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+  .kpi{background:linear-gradient(180deg,var(--panel),#0D1522);border:1px solid var(--line);border-radius:var(--radius);padding:16px 17px;position:relative;overflow:hidden}
+  .kpi .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .kpi .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx-3)}
+  .kpi .ico{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+  .kpi .ico svg{width:16px;height:16px}
+  .kpi .val{font-family:var(--display);font-weight:700;font-size:30px;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .kpi .val .unit{font-size:14px;color:var(--tx-3);font-weight:600;margin-left:3px}
+  .kpi .sub{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--tx-3)}
+
+  .grid{display:grid;gap:14px}
+  .g-2-1{grid-template-columns:1.62fr 1fr}
+  .g-2{grid-template-columns:1fr 1fr}
+  @media(max-width:1080px){.g-2-1,.g-2{grid-template-columns:1fr}}
+  @media(max-width:920px){.kpis{grid-template-columns:repeat(2,1fr)}.app{grid-template-columns:1fr}.sidebar{display:none}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 17px;border-bottom:1px solid var(--line)}
+  .panel-h .t{font-family:var(--display);font-weight:600;font-size:14.5px}
+  .panel-h .s{font-family:var(--mono);font-size:10.5px;color:var(--tx-3);margin-top:2px}
+  .panel-b{padding:16px 17px}
+
+  .scanbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  .scanbar .field{position:relative;flex:1;min-width:240px}
+  .scanbar .field .ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--tx-3);width:15px;height:15px}
+  .scanbar input,.scanbar select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:10px 12px 10px 34px;color:var(--tx-1);font-family:var(--mono);font-size:13px}
+  .scanbar select{padding-left:12px}
+  .scanbar input:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft);outline:none}
+
+  .plat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:11px}
+  .plat{display:flex;align-items:center;gap:11px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);transition:.15s}
+  .plat.found{border-color:rgba(61,190,107,.32);background:linear-gradient(180deg,var(--ok-soft),transparent)}
+  .plat .pic{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;background:var(--panel-2);border:1px solid var(--line);font-family:var(--display);font-weight:700;font-size:14px;flex:0 0 auto}
+  .plat .info{min-width:0;flex:1}
+  .plat .info .pn{font-weight:600;font-size:13px}
+  .plat .info .pu{font-family:var(--mono);font-size:10.5px;color:var(--tx-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .st-ic{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto}
+  .st-ic.y{background:var(--ok-soft);color:var(--ok)}.st-ic.n{background:var(--panel-2);color:var(--tx-3)}
+  .st-ic svg{width:12px;height:12px}
+
+  .tbl-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tx-3);font-weight:600;padding:0 16px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  tbody td{padding:12px 16px;border-bottom:1px solid rgba(32,48,74,.55);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr{transition:background .12s}
+  tbody tr:hover{background:var(--panel-2)}
+  .mono{font-family:var(--mono)}
+  .num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  td .ent{display:flex;align-items:center;gap:10px}
+  td .ent .nm{font-weight:600;color:var(--tx-1)}
+  td .ent .sq{font-family:var(--mono);font-size:10.5px;color:var(--tx-3)}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono);white-space:nowrap}
+  .pill .d{width:6px;height:6px;border-radius:50%}
+  .pill.ok{color:var(--ok);background:var(--ok-soft)}.pill.ok .d{background:var(--ok)}
+  .pill.low{color:var(--low);background:var(--low-soft)}.pill.low .d{background:var(--low)}
+  .pill.med{color:var(--med);background:var(--med-soft)}.pill.med .d{background:var(--med)}
+  .pill.crit{color:var(--crit);background:var(--crit-soft)}.pill.crit .d{background:var(--crit)}
+  .pill.mut{color:var(--tx-2);background:var(--panel-2)}.pill.mut .d{background:var(--tx-3)}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:7px;border:1px solid var(--line);background:var(--panel-2);font-family:var(--mono);font-size:11px;color:var(--tx-2)}
+
+  .rec{display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:center;padding:11px 0;border-bottom:1px solid rgba(32,48,74,.55)}
+  .rec:last-child{border-bottom:none}
+  .rec .rk{font-family:var(--mono);font-size:11px;color:var(--tx-3)}
+  .rec .rv{font-family:var(--mono);font-size:12.5px;color:var(--tx-1);word-break:break-all}
+  .rec .rt{font-family:var(--mono);font-size:10.5px;color:var(--tx-3)}
+
+  .field-lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx-3);margin-bottom:6px}
+
+  .empty{padding:40px 20px;text-align:center;color:var(--tx-3)}
+  .empty svg{width:34px;height:34px;opacity:.5;margin-bottom:10px}
+  .spinner{width:18px;height:18px;border:2px solid var(--line-2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading{display:flex;align-items:center;gap:10px;justify-content:center;padding:36px;color:var(--tx-2);font-family:var(--mono);font-size:12.5px}
+
+  .notice{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;background:var(--low-soft);border:1px solid rgba(224,179,65,.3);color:var(--tx-2);font-size:12.5px}
+  .notice svg{width:16px;height:16px;color:var(--low);flex:0 0 auto;margin-top:1px}
+  .notice.ok{background:var(--ok-soft);border-color:rgba(61,190,107,.3)}.notice.ok svg{color:var(--ok)}
+
+  /* dropdowns / forms */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.form-grid{grid-template-columns:1fr}}
+  .fld label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx-3);margin-bottom:6px}
+  .fld input,.fld select,.fld textarea{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:9px;padding:10px 12px;color:var(--tx-1);font-family:var(--mono);font-size:13px}
+  .fld input:focus,.fld textarea:focus,.fld select:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft);outline:none}
+  .fld textarea{min-height:78px;resize:vertical;font-family:var(--sans)}
+
+  .map-strip{height:150px;border-radius:10px;border:1px solid var(--line);position:relative;overflow:hidden;background:radial-gradient(400px 200px at 30% 40%,rgba(51,193,227,.12),transparent 70%),var(--ink)}
+  .map-strip .grid-ln{position:absolute;inset:0;background-image:linear-gradient(rgba(51,193,227,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(51,193,227,.06) 1px,transparent 1px);background-size:28px 28px}
+  .map-strip .pin .ring{width:16px;height:16px;border-radius:50%;border:2px solid var(--accent);position:absolute}
+  .map-strip .co{position:absolute;left:12px;bottom:10px;font-family:var(--mono);font-size:10.5px;color:var(--tx-2)}
+
+  .sev{display:flex;flex-direction:column;gap:12px}
+  .sev-row{display:grid;grid-template-columns:70px 1fr 38px;align-items:center;gap:12px}
+  .sev-row .k{display:flex;align-items:center;gap:7px;font-size:12.5px}
+  .sev-row .k .d{width:8px;height:8px;border-radius:2px}
+  .sev-track{height:9px;background:var(--ink);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+  .sev-fill{height:100%;border-radius:5px}
+  .sev-row .v{font-family:var(--mono);font-size:12.5px;text-align:right}
+
+  .tline{position:relative;padding-left:20px}
+  .tline::before{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:2px;background:var(--line)}
+  .tnode{position:relative;padding:0 0 16px}
+  .tnode:last-child{padding-bottom:0}
+  .tnode::before{content:"";position:absolute;left:-19px;top:3px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .tnode .dt{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:600}
+  .tnode .tt{font-size:12.5px;color:var(--tx-1);margin-top:2px}
+
+  .toast{position:fixed;right:22px;bottom:22px;background:var(--panel-3);border:1px solid var(--line-2);border-radius:10px;padding:12px 16px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200;opacity:0;transform:translateY(10px);transition:.22s;max-width:340px}
+  .toast.show{opacity:1;transform:none}
+  .toast.err{border-color:var(--crit)}
+  .dropzone{border:1.5px dashed var(--line-2);border-radius:12px;padding:34px;text-align:center;color:var(--tx-2);cursor:pointer;transition:.15s}
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:var(--accent-soft)}
+  .dropzone svg{width:30px;height:30px;color:var(--tx-3);margin-bottom:10px}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="13" stroke="#33C1E3" stroke-width="1.4" opacity=".55"/><circle cx="16" cy="16" r="8" stroke="#33C1E3" stroke-width="1.4" opacity=".8"/><circle cx="16" cy="16" r="2.4" fill="#33C1E3"/><path d="M16 3v6M16 23v6M3 16h6M23 16h6" stroke="#33C1E3" stroke-width="1.4"/><path d="M16 16 L26 9" stroke="#33C1E3" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="name">SENTINEL</span>
+    </div>
+    <div class="login-sub">OSINT&nbsp;Console</div>
+
+    <!-- Sign in -->
+    <form id="loginForm">
+      <label>Username</label>
+      <input id="liUser" autocomplete="username" spellcheck="false" placeholder="superadmin">
+      <label>Password</label>
+      <input id="liPass" type="password" autocomplete="current-password">
+      <button type="submit" id="liBtn">Sign in</button>
+    </form>
+
+    <!-- Register -->
+    <form id="registerForm" hidden>
+      <label>Full name</label>
+      <input id="rgName" autocomplete="name" spellcheck="false">
+      <label>Email</label>
+      <input id="rgEmail" type="email" autocomplete="email" spellcheck="false">
+      <label>Username</label>
+      <input id="rgUser" autocomplete="username" spellcheck="false">
+      <label>Password</label>
+      <input id="rgPass" type="password" autocomplete="new-password">
+      <button type="submit" id="rgBtn">Create account</button>
+    </form>
+
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-hint" id="loginHint">First-run admin password is shown in the server console. &nbsp;<a href="#" id="toRegister">Create an account</a></div>
+    <div class="login-hint" id="registerHint" hidden>New accounts are read-only and need admin approval before first sign-in. &nbsp;<a href="#" id="toLogin">Back to sign in</a></div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div class="app" id="app" hidden>
+  <aside class="sidebar">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="13" stroke="#33C1E3" stroke-width="1.4" opacity=".55"/><circle cx="16" cy="16" r="8" stroke="#33C1E3" stroke-width="1.4" opacity=".8"/><circle cx="16" cy="16" r="2.4" fill="#33C1E3"/><path d="M16 3v6M16 23v6M3 16h6M23 16h6" stroke="#33C1E3" stroke-width="1.4"/><path d="M16 16 L26 9" stroke="#33C1E3" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <div><div class="name">SENTINEL</div><div class="sub">OSINT&nbsp;Console</div></div>
+    </div>
+    <nav class="nav">
+      <div class="grouplbl">Operations</div>
+      <button class="active" data-view="overview" data-perm="dashboard:view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</button>
+      <button data-view="cases" data-perm="cases:view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v13H3zM3 7l2-3h6l2 3"/></svg>Cases <span class="count" id="navCases">0</span></button>
+      <button data-view="graph" data-perm="graph:view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="6" r="2.4"/><circle cx="19" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M7 7l4 9M17 7l-4 9M7 6h10"/></svg>Relationship graph</button>
+      <div class="grouplbl">Collection modules</div>
+      <button data-view="username" data-perm="scan:run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Username</button>
+      <button data-view="email" data-perm="scan:run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Email &amp; breaches</button>
+      <button data-view="phone" data-perm="scan:run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h4l2 5-3 2a12 12 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>Phone</button>
+      <button data-view="domain" data-perm="scan:run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>Domain &amp; DNS</button>
+      <button data-view="ip" data-perm="scan:run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>IP intelligence</button>
+      <button data-view="metadata" data-perm="scan:run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/></svg>Metadata</button>
+      <button data-view="archive" data-perm="scan:run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v5l3 2"/><circle cx="12" cy="13" r="8"/><path d="M4 5 8 3M20 5 16 3"/></svg>Archive</button>
+      <button data-view="websearch" data-perm="scan:run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Web search</button>
+      <div class="grouplbl">System</div>
+      <button data-view="reports" data-perm="reports:generate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Reports</button>
+      <button data-view="users" data-perm="users:view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><path d="M16 4a3.2 3.2 0 0 1 0 6M18 14c2 .6 3 2 3 5"/></svg>Users &amp; roles</button>
+      <button data-view="audit" data-perm="audit:view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Audit log</button>
+      <button data-view="settings" data-perm="settings:manage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1L14.5 2h-5l-.3 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.5L3 11a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 1.7 1l.3 2.5h5l.3-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5a7 7 0 0 0 .1-1z"/></svg>Settings</button>
+    </nav>
+    <div class="sidefoot"><span class="dot"></span><div class="m">API <b>online</b><br><span id="footUser">—</span></div></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="search">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="text" placeholder="Search any selector — username, email, domain, IP…" autocomplete="off" spellcheck="false">
+        <span class="detect" id="detect">type&nbsp;<b>—</b></span>
+      </div>
+      <div class="spacer"></div>
+      <button class="tb-btn" id="logoutBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 21H5V3h4M16 17l5-5-5-5M21 12H9"/></svg>Sign out</button>
+      <div class="avatar" id="avatar">?</div>
+    </header>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================ API layer ============================ */
+const TOKEN_KEY = "sentinel_token";
+let TOKEN = null, USER = null, ACTIVE_CASE = null, CASES = [];
+try { TOKEN = localStorage.getItem(TOKEN_KEY); } catch(e){}
+
+async function api(path, opts={}){
+  const headers = Object.assign({}, opts.headers||{});
+  if(TOKEN) headers["Authorization"] = "Bearer "+TOKEN;
+  if(opts.body && !(opts.body instanceof FormData)){
+    headers["Content-Type"]="application/json";
+    opts.body = JSON.stringify(opts.body);
+  }
+  const r = await fetch("/api"+path, Object.assign({}, opts, {headers}));
+  if(r.status===401){ logout(); throw new Error("Session expired — please sign in again."); }
+  let data=null; try{ data = await r.json(); }catch(e){}
+  if(!r.ok) throw new Error((data && data.detail) || ("Request failed ("+r.status+")"));
+  return data;
+}
+function toast(msg, isErr){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.className="toast show"+(isErr?" err":"");
+  setTimeout(()=>t.className="toast",3200);
+}
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ============================ auth ============================ */
+const loginScreen=document.getElementById("loginScreen"), appEl=document.getElementById("app");
+document.getElementById("loginForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const btn=document.getElementById("liBtn"), err=document.getElementById("loginErr");
+  err.textContent=""; btn.textContent="Signing in…"; btn.disabled=true;
+  try{
+    const res=await api("/auth/login",{method:"POST",body:{username:liUser.value.trim(),password:liPass.value}});
+    TOKEN=res.token; try{localStorage.setItem(TOKEN_KEY,TOKEN);}catch(e){}
+    USER=res.user; startApp();
+    if(res.must_change_password) toast("You're using default credentials — set a new password in Settings.");
+  }catch(ex){ err.textContent=ex.message; }
+  btn.textContent="Sign in"; btn.disabled=false;
+});
+// --- register / sign-in toggle ---
+function showRegister(on){
+  document.getElementById("loginForm").hidden=on;
+  document.getElementById("registerForm").hidden=!on;
+  document.getElementById("loginHint").hidden=on;
+  document.getElementById("registerHint").hidden=!on;
+  document.getElementById("loginErr").textContent="";
+}
+document.getElementById("toRegister").addEventListener("click",e=>{e.preventDefault();showRegister(true);});
+document.getElementById("toLogin").addEventListener("click",e=>{e.preventDefault();showRegister(false);});
+document.getElementById("registerForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const btn=document.getElementById("rgBtn"), err=document.getElementById("loginErr");
+  err.textContent=""; btn.textContent="Creating…"; btn.disabled=true;
+  try{
+    const res=await api("/auth/register",{method:"POST",body:{
+      username:rgUser.value.trim(), password:rgPass.value,
+      full_name:rgName.value.trim(), email:rgEmail.value.trim()}});
+    showRegister(false);
+    toast(res.message || "Registration saved — awaiting admin approval.");
+    liUser.value=rgUser.value.trim(); liPass.value="";
+  }catch(ex){ err.textContent=ex.message; }
+  btn.textContent="Create account"; btn.disabled=false;
+});
+
+function logout(){
+  TOKEN=null; USER=null; try{localStorage.removeItem(TOKEN_KEY);}catch(e){}
+  appEl.hidden=true; loginScreen.hidden=false;
+}
+document.getElementById("logoutBtn").addEventListener("click", logout);
+
+function can(p){ return USER && USER.permissions && USER.permissions.indexOf(p)>=0; }
+async function startApp(){
+  loginScreen.hidden=true; appEl.hidden=false;
+  document.getElementById("footUser").textContent = USER.username+" · "+(USER.role_label||USER.role);
+  document.getElementById("avatar").textContent = USER.username.slice(0,2).toUpperCase();
+  // permission-gate the nav
+  navBtns.forEach(b=>{ const need=b.dataset.perm; b.style.display = (!need||can(need))?"":"none"; });
+  if(can("cases:view")) await refreshCases();
+  route("overview");
+}
+
+/* ============================ routing ============================ */
+const navBtns=[...document.querySelectorAll(".nav button")];
+navBtns.forEach(b=>b.addEventListener("click",()=>route(b.dataset.view)));
+function route(view){
+  navBtns.forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  const fn=VIEWS[view]; if(fn) fn();
+  window.scrollTo(0,0);
+}
+const C=()=>document.getElementById("content");
+
+/* selector auto-detect */
+const q=document.getElementById("q"), detect=document.getElementById("detect");
+function classify(v){
+  v=(v||"").trim(); if(!v) return "—";
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "email";
+  if(/^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(v)) return "ipv4";
+  if(/^[a-f0-9]{32}$/i.test(v)) return "md5";
+  if(/^([a-z0-9-]+\.)+[a-z]{2,}$/i.test(v)) return "domain";
+  return "username";
+}
+const ROUTE_MAP={email:"email",ipv4:"ip",domain:"domain",username:"username"};
+q.addEventListener("input",()=>{ detect.innerHTML="type&nbsp;<b>"+classify(q.value)+"</b>"; });
+q.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    const t=classify(q.value), r=ROUTE_MAP[t]||"username";
+    route(r);
+    setTimeout(()=>{ const inp=document.getElementById("modInput"); if(inp){ inp.value=q.value.trim(); const rb=document.getElementById("runBtn"); if(rb) rb.click(); } },60);
+  }
+});
+
+/* helpers */
+function pageHead(title,thin,desc){
+  return `<div class="pagehead"><div><div class="h">${title}${thin?` <span class="thin">${thin}</span>`:""}</div>${desc?`<p>${desc}</p>`:""}</div>
+    <div>${caseSelectorHTML()}</div></div>`;
+}
+function caseSelectorHTML(){
+  const opts=['<option value="">— no case (don\'t log) —</option>']
+    .concat(CASES.map(c=>`<option value="${c.id}" ${c.id===ACTIVE_CASE?"selected":""}>${esc(c.name)} (${c.id})</option>`));
+  return `<div class="fld"><label>Active case — findings are saved here</label>
+    <select id="caseSelect" style="min-width:260px">${opts.join("")}</select></div>`;
+}
+function bindCaseSelect(){
+  const s=document.getElementById("caseSelect");
+  if(s) s.addEventListener("change",()=>{ ACTIVE_CASE=s.value||null; });
+}
+function sevPill(s){
+  const m={critical:"crit",high:"crit",medium:"med",low:"low",info:"mut",clean:"ok"};
+  return `<span class="pill ${m[s]||"mut"}"><span class="d"></span>${esc(s||"info")}</span>`;
+}
+function scanForm(label,placeholder,btn){
+  return `<div class="scanbar">
+    <div class="field"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="modInput" placeholder="${placeholder}" spellcheck="false"></div>
+    <button class="tb-btn primary" id="runBtn">${btn||"Run scan"}</button>
+  </div>`;
+}
+function loadingHTML(msg){return `<div class="panel"><div class="loading"><span class="spinner"></span>${msg||"Collecting…"}</div></div>`;}
+function keyNotice(txt){return `<div class="notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div>${txt}</div></div>`;}
+
+/* ============================ VIEWS ============================ */
+const VIEWS={};
+
+/* ---------- Overview ---------- */
+VIEWS.overview=async function(){
+  C().innerHTML=pageHead("Investigation overview","",
+    "Live aggregate across all modules. Run a scan from any module with an active case to populate these figures.")+loadingHTML("Loading dashboard…");
+  bindCaseSelect();
+  try{
+    const d=await api("/dashboard");
+    const sev=d.by_severity||{};
+    const rows=(d.recent_findings||[]).map(f=>`<tr>
+      <td><div class="ent"><div><div class="nm">${esc(f.selector)}</div><div class="sq">${esc(f.module)}</div></div></div></td>
+      <td><span class="chip">${esc(f.module)}</span></td>
+      <td class="mono" style="color:var(--tx-2)">${esc(f.summary||"—")}</td>
+      <td>${sevPill(f.severity)}</td></tr>`).join("");
+    C().innerHTML=pageHead("Investigation overview","",
+      "Live aggregate across all modules. Run a scan from any module with an active case to populate these figures.")+`
+    <div class="kpis">
+      <div class="kpi"><div class="top"><span class="lbl">Cases</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 7h18v13H3zM3 7l2-3h6l2 3"/></svg></span></div><div class="val">${d.cases_count!=null?d.cases_count:(CASES.length)}</div><div class="sub">investigations</div></div>
+      <div class="kpi"><div class="top"><span class="lbl">Findings</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span></div><div class="val">${d.findings}</div><div class="sub">logged</div></div>
+      <div class="kpi"><div class="top"><span class="lbl">Selectors</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span></div><div class="val">${d.selectors}</div><div class="sub">distinct</div></div>
+      <div class="kpi"><div class="top"><span class="lbl">Critical</span><span class="ico" style="background:var(--crit-soft);color:var(--crit)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></svg></span></div><div class="val" style="color:${(sev.critical||0)?'var(--crit)':'inherit'}">${sev.critical||0}</div><div class="sub">need review</div></div>
+    </div>
+    <div class="grid g-2-1">
+      <div class="panel"><div class="panel-h"><div><div class="t">Recent findings</div><div class="s">latest across modules</div></div></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Selector</th><th>Module</th><th>Summary</th><th>Severity</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="4"><div class="empty">No findings yet — run a scan with an active case selected.</div></td></tr>'}</tbody></table></div></div>
+      <div class="panel"><div class="panel-h"><div><div class="t">Findings by severity</div></div></div>
+        <div class="panel-b">${sevBars(sev,d.findings)}</div></div>
+    </div>`;
+  }catch(ex){ C().innerHTML=pageHead("Investigation overview")+keyNotice(esc(ex.message)); }
+};
+function sevBars(sev,total){
+  total=total||1;
+  const order=[["critical","var(--crit)"],["medium","var(--med)"],["low","var(--low)"],["info","var(--ok)"]];
+  return `<div class="sev">`+order.map(([k,c])=>{
+    const v=sev[k]||0, pct=Math.round(v/Math.max(total,1)*100);
+    return `<div class="sev-row"><span class="k"><span class="d" style="background:${c}"></span>${k[0].toUpperCase()+k.slice(1)}</span>
+      <span class="sev-track"><span class="sev-fill" style="width:${pct}%;background:${c}"></span></span><span class="v">${v}</span></div>`;
+  }).join("")+`</div>`;
+}
+
+/* ---------- Username ---------- */
+VIEWS.username=function(){
+  C().innerHTML=pageHead("Username enumeration","","Resolve a handle across 20+ platforms in parallel. Real HTTP checks, validated to cut false positives.")
+    +scanForm("","e.g. john_doe","Run scan")
+    +`<div id="modOut"></div>`;
+  bindCaseSelect();
+  const run=async()=>{
+    const u=document.getElementById("modInput").value.trim(); if(!u) return;
+    document.getElementById("modOut").innerHTML=loadingHTML("Checking platforms…");
+    try{
+      const r=await api("/scan/username",{method:"POST",body:{username:u,case_id:ACTIVE_CASE}});
+      const cards=r.results.map(p=>{
+        const ok=p.found, host=(p.url.replace(/^https?:\/\//,"").split("/")[0]);
+        return `<div class="plat ${ok?"found":""}"><div class="pic">${esc(p.platform[0])}</div>
+          <div class="info"><div class="pn">${esc(p.platform)}</div><div class="pu">${ok?`<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(host)}</a>`:esc(host)}${p.error?" · "+esc(p.error):""}</div></div>
+          <span class="st-ic ${ok?"y":"n"}">${ok?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M6 6l12 12M18 6L6 18"/></svg>'}</span></div>`;
+      }).join("");
+      document.getElementById("modOut").innerHTML=`
+        <div class="scanbar" style="margin-bottom:14px"><span class="chip"><span style="color:var(--ok);font-weight:700">${r.found}</span>&nbsp;found</span><span class="chip">${r.checked}&nbsp;checked</span>${ACTIVE_CASE?'<span class="chip" style="color:var(--accent)">saved to case</span>':""}</div>
+        <div class="panel"><div class="panel-b"><div class="plat-grid">${cards}</div></div></div>`;
+      if(ACTIVE_CASE){ toast("Finding saved to case"); }
+    }catch(ex){ document.getElementById("modOut").innerHTML=keyNotice(esc(ex.message)); }
+  };
+  document.getElementById("runBtn").addEventListener("click",run);
+  document.getElementById("modInput").addEventListener("keydown",e=>{if(e.key==="Enter")run();});
+};
+
+/* ---------- Email ---------- */
+VIEWS.email=function(){
+  C().innerHTML=pageHead("Email &amp; breach exposure","","Validate format + MX and, with a HaveIBeenPwned key, pull real breach records ranked by severity.")
+    +scanForm("","e.g. name@example.com","Check exposure")+`<div id="modOut"></div>`;
+  bindCaseSelect();
+  const run=async()=>{
+    const em=document.getElementById("modInput").value.trim(); if(!em) return;
+    document.getElementById("modOut").innerHTML=loadingHTML("Checking exposure…");
+    try{
+      const r=await api("/scan/email",{method:"POST",body:{email:em,case_id:ACTIVE_CASE}});
+      let breachHTML="";
+      if(!r.breach.configured){
+        breachHTML=keyNotice(esc(r.breach.note||"Add a HaveIBeenPwned API key in Settings to pull breach records."));
+      }else if(r.breach.error){
+        breachHTML=keyNotice("HIBP error: "+esc(r.breach.error));
+      }else if(r.breach.count===0){
+        breachHTML=`<div class="notice ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>No breaches found for this address.</div>`;
+      }else{
+        const rows=r.breach.breaches.map(b=>`<tr><td><div class="ent"><div><div class="nm">${esc(b.title||b.name)}</div><div class="sq">${esc(b.name)}</div></div></div></td>
+          <td class="mono">${esc(b.date)}</td><td class="num">${(b.records||0).toLocaleString()}</td>
+          <td>${(b.data_classes||[]).map(d=>`<span class="chip">${esc(d)}</span>`).join(" ")}</td>
+          <td>${sevPill(b.severity)}</td></tr>`).join("");
+        breachHTML=`<div class="panel"><div class="panel-h"><div><div class="t">Breach exposure</div><div class="s">${r.breach.count} breaches</div></div></div>
+          <div class="tbl-wrap"><table><thead><tr><th>Source</th><th>Disclosed</th><th>Records</th><th>Data classes</th><th>Severity</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      }
+      const riskColor=r.risk==="High"?"var(--crit)":r.risk==="Medium"?"var(--med)":"inherit";
+      document.getElementById("modOut").innerHTML=`
+        <div class="kpis" style="margin-bottom:14px">
+          <div class="kpi"><div class="top"><span class="lbl">Address</span></div><div class="mono" style="font-size:14px;color:var(--tx-1);word-break:break-all">${esc(r.selector)}</div><div class="sub">${r.valid_format?"valid format":"invalid format"} · ${r.has_mx?"MX ok":"no MX"}${r.disposable?" · disposable":""}</div></div>
+          <div class="kpi"><div class="top"><span class="lbl">Breaches</span></div><div class="val">${r.breach.configured?(r.breach.count||0):"—"}</div><div class="sub">${r.breach.configured?"records found":"key not set"}</div></div>
+          <div class="kpi"><div class="top"><span class="lbl">MX hosts</span></div><div class="val">${(r.mx||[]).length}</div><div class="sub">${esc((r.mx||[])[0]||"none")}</div></div>
+          <div class="kpi"><div class="top"><span class="lbl">Risk</span></div><div class="val" style="color:${riskColor}">${esc(r.risk)}</div><div class="sub">overall</div></div>
+        </div>${breachHTML}`;
+    }catch(ex){ document.getElementById("modOut").innerHTML=keyNotice(esc(ex.message)); }
+  };
+  document.getElementById("runBtn").addEventListener("click",run);
+  document.getElementById("modInput").addEventListener("keydown",e=>{if(e.key==="Enter")run();});
+};
+
+/* ---------- Domain & DNS ---------- */
+VIEWS.domain=function(){
+  C().innerHTML=pageHead("Domain &amp; DNS intelligence","","Live DNS resolution plus subdomain discovery from crt.sh certificate-transparency logs.")
+    +scanForm("","e.g. example.com","Resolve")+`<div id="modOut"></div>`;
+  bindCaseSelect();
+  const run=async()=>{
+    const dm=document.getElementById("modInput").value.trim(); if(!dm) return;
+    document.getElementById("modOut").innerHTML=loadingHTML("Resolving DNS + certificate logs…");
+    try{
+      const r=await api("/scan/domain",{method:"POST",body:{domain:dm,case_id:ACTIVE_CASE}});
+      const recs=Object.entries(r.records||{}).map(([k,vals])=>
+        (Array.isArray(vals)?vals:[vals]).map(v=>`<div class="rec"><span class="rk">${esc(k)}</span><span class="rv">${esc(v)}</span><span class="rt"></span></div>`).join("")
+      ).join("")||`<div class="empty">No DNS records resolved.</div>`;
+      const mp=r.mail_posture||{};
+      const postureRow=(k,val)=>{const m={pass:"ok",missing:"crit",check:"low"};return `<div class="sev-row" style="grid-template-columns:70px 1fr auto"><span class="k">${k}</span><span></span><span class="pill ${m[val]||"mut"}"><span class="d"></span>${val}</span></div>`;};
+      const subs=(r.subdomains||[]).map(s=>`<div class="rec" style="grid-template-columns:1fr auto"><span class="rv">${esc(s)}</span><span class="rt">crt.sh</span></div>`).join("")||`<div class="empty">No subdomains found in CT logs.</div>`;
+      document.getElementById("modOut").innerHTML=`
+        <div class="grid g-2-1" style="margin-bottom:14px">
+          <div class="panel"><div class="panel-h"><div><div class="t">DNS records — ${esc(r.selector)}</div><div class="s">${r.record_count} record sets</div></div></div><div class="panel-b" style="padding-top:6px">${recs}</div></div>
+          <div class="panel"><div class="panel-h"><div><div class="t">Mail auth posture</div></div></div><div class="panel-b"><div class="sev">${postureRow("SPF",mp.spf)}${postureRow("DKIM",mp.dkim)}${postureRow("DMARC",mp.dmarc)}</div></div></div>
+        </div>
+        <div class="panel"><div class="panel-h"><div><div class="t">Subdomain surface</div><div class="s">${r.subdomain_count} discovered</div></div><span class="chip">certificate transparency</span></div><div class="panel-b" style="padding-top:6px">${subs}</div></div>`;
+    }catch(ex){ document.getElementById("modOut").innerHTML=keyNotice(esc(ex.message)); }
+  };
+  document.getElementById("runBtn").addEventListener("click",run);
+  document.getElementById("modInput").addEventListener("keydown",e=>{if(e.key==="Enter")run();});
+};
+
+/* ---------- IP ---------- */
+VIEWS.ip=function(){
+  C().innerHTML=pageHead("IP intelligence","","Geolocation and network ownership via ip-api. Add a Shodan key in Settings for exposed ports & services.")
+    +scanForm("","e.g. 8.8.8.8","Look up")+`<div id="modOut"></div>`;
+  bindCaseSelect();
+  const run=async()=>{
+    const ip=document.getElementById("modInput").value.trim(); if(!ip) return;
+    document.getElementById("modOut").innerHTML=loadingHTML("Looking up IP…");
+    try{
+      const r=await api("/scan/ip",{method:"POST",body:{ip:ip,case_id:ACTIVE_CASE}});
+      const g=r.geo||{};
+      if(g.error){ document.getElementById("modOut").innerHTML=keyNotice("Lookup failed: "+esc(g.error)); return; }
+      let ports="";
+      const sh=r.shodan||{};
+      if(!sh.configured){ ports=keyNotice(esc(sh.note||"Add a Shodan key in Settings for ports & services.")); }
+      else if(sh.error){ ports=keyNotice("Shodan: "+esc(sh.error)); }
+      else{
+        const rows=(sh.services||[]).map(s=>`<div class="rec" style="grid-template-columns:60px 1fr auto"><span class="rk">${esc(s.port)}</span><span class="rv">${esc(s.product||s.transport||"")} ${esc(s.banner||"")}</span><span class="pill mut"><span class="d"></span>${esc(s.transport||"tcp")}</span></div>`).join("");
+        ports=`<div class="panel"><div class="panel-h"><div><div class="t">Exposed services</div><div class="s">${(sh.ports||[]).length} open ports · Shodan</div></div></div><div class="panel-b" style="padding-top:6px">${rows||'<div class="empty">No services returned.</div>'}</div></div>`;
+      }
+      const lat=g.lat, lon=g.lon;
+      const leftPct=lon!=null?((lon+180)/360*100).toFixed(1):50, topPct=lat!=null?((90-lat)/180*100).toFixed(1):50;
+      document.getElementById("modOut").innerHTML=`
+        <div class="grid g-2-1" style="margin-bottom:14px">
+          <div class="panel"><div class="panel-h"><div><div class="t">Geolocation &amp; network</div></div><span class="pill low"><span class="d"></span>${esc(g.org||g.isp||"network")}</span></div>
+            <div class="map-strip"><div class="grid-ln"></div><div class="pin"><div class="ring" style="left:${leftPct}%;top:${topPct}%"></div></div><div class="co">${g.lat!=null?g.lat+"° , "+g.lon+"°":""} · ${esc(g.city||"")}${g.city?", ":""}${esc(g.country||"")}</div></div>
+            <div class="panel-b"><div class="rec" style="grid-template-columns:120px 1fr"><span class="rk">Country</span><span class="rv">${esc(g.country||"—")} (${esc(g.countryCode||"")})</span></div>
+              <div class="rec" style="grid-template-columns:120px 1fr"><span class="rk">City / region</span><span class="rv">${esc(g.city||"—")}, ${esc(g.regionName||"")}</span></div>
+              <div class="rec" style="grid-template-columns:120px 1fr"><span class="rk">ISP</span><span class="rv">${esc(g.isp||"—")}</span></div>
+              <div class="rec" style="grid-template-columns:120px 1fr"><span class="rk">ASN</span><span class="rv">${esc(g.as||"—")}</span></div>
+              <div class="rec" style="grid-template-columns:120px 1fr"><span class="rk">Reverse DNS</span><span class="rv">${esc(r.reverse_dns||"—")}</span></div></div></div>
+          ${ports}
+        </div>`;
+    }catch(ex){ document.getElementById("modOut").innerHTML=keyNotice(esc(ex.message)); }
+  };
+  document.getElementById("runBtn").addEventListener("click",run);
+  document.getElementById("modInput").addEventListener("keydown",e=>{if(e.key==="Enter")run();});
+};
+
+/* ---------- Phone ---------- */
+VIEWS.phone=function(){
+  C().innerHTML=pageHead("Phone intelligence","","Parse and validate a number fully offline (Google libphonenumber): region, carrier, line type and timezones. Include the country code, e.g. +9647701234567.")
+    +scanForm("","e.g. +9647701234567","Analyze")+`<div id="modOut"></div>`;
+  bindCaseSelect();
+  const run=async()=>{
+    const ph=document.getElementById("modInput").value.trim(); if(!ph) return;
+    document.getElementById("modOut").innerHTML=loadingHTML("Parsing number…");
+    try{
+      const r=await api("/scan/phone",{method:"POST",body:{phone:ph,case_id:ACTIVE_CASE}});
+      if(r.error){ document.getElementById("modOut").innerHTML=keyNotice(esc(r.error)); return; }
+      const validPill=r.valid?`<span class="pill ok"><span class="d"></span>Valid</span>`:(r.possible?`<span class="pill low"><span class="d"></span>Possible</span>`:`<span class="pill crit"><span class="d"></span>Invalid</span>`);
+      document.getElementById("modOut").innerHTML=`
+        <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
+          <div class="kpi"><div class="top"><span class="lbl">E.164</span></div><div class="mono" style="font-size:15px;color:var(--tx-1)">${esc(r.e164||"—")}</div><div class="sub" style="margin-top:8px">${validPill}</div></div>
+          <div class="kpi"><div class="top"><span class="lbl">Region</span></div><div class="val" style="font-size:24px">${esc(r.region||"—")}</div><div class="sub">+${esc(r.country_code)} · ${esc(r.location||"")}</div></div>
+          <div class="kpi"><div class="top"><span class="lbl">Line type</span></div><div class="big-val" style="font-family:var(--display);font-size:19px">${esc(r.line_type||"—")}</div><div class="sub">${esc(r.carrier||"carrier unknown")}</div></div>
+          <div class="kpi"><div class="top"><span class="lbl">Timezone</span></div><div class="mono" style="font-size:13px;color:var(--tx-1)">${esc((r.timezones||[]).join(", ")||"—")}</div></div>
+        </div>
+        <div class="panel"><div class="panel-h"><div><div class="t">Parsed formats</div></div></div><div class="panel-b" style="padding-top:6px">
+          <div class="rec"><span class="rk">International</span><span class="rv">${esc(r.international||"—")}</span><span class="rt"></span></div>
+          <div class="rec"><span class="rk">National</span><span class="rv">${esc(r.national||"—")}</span><span class="rt"></span></div>
+          <div class="rec"><span class="rk">Carrier</span><span class="rv">${esc(r.carrier||"—")}</span><span class="rt"></span></div>
+          <div class="rec"><span class="rk">Location</span><span class="rv">${esc(r.location||"—")}</span><span class="rt"></span></div>
+        </div></div>`;
+    }catch(ex){ document.getElementById("modOut").innerHTML=keyNotice(esc(ex.message)); }
+  };
+  document.getElementById("runBtn").addEventListener("click",run);
+  document.getElementById("modInput").addEventListener("keydown",e=>{if(e.key==="Enter")run();});
+};
+
+/* ---------- Metadata ---------- */
+VIEWS.metadata=function(){
+  C().innerHTML=pageHead("Metadata extraction","","Upload an image or PDF — EXIF (incl. GPS), document properties and hashes are extracted locally by the server.")
+    +`<div class="panel"><div class="panel-b"><div class="dropzone" id="drop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+        <div>Drop a file here or <b style="color:var(--accent)">browse</b></div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--tx-3);margin-top:6px">JPG · PNG · PDF · max 25 MB</div>
+        <input type="file" id="fileInput" hidden></div></div></div><div id="modOut" style="margin-top:14px"></div>`;
+  bindCaseSelect();
+  const drop=document.getElementById("drop"), input=document.getElementById("fileInput");
+  drop.addEventListener("click",()=>input.click());
+  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag");});
+  drop.addEventListener("dragleave",()=>drop.classList.remove("drag"));
+  drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("drag");if(e.dataTransfer.files[0])upload(e.dataTransfer.files[0]);});
+  input.addEventListener("change",()=>{if(input.files[0])upload(input.files[0]);});
+  async function upload(file){
+    document.getElementById("modOut").innerHTML=loadingHTML("Extracting metadata…");
+    const fd=new FormData(); fd.append("file",file); if(ACTIVE_CASE) fd.append("case_id",ACTIVE_CASE);
+    try{
+      const r=await api("/scan/metadata",{method:"POST",body:fd});
+      let gpsHTML="";
+      if(r.gps){
+        const leftPct=((r.gps.lon+180)/360*100).toFixed(1), topPct=((90-r.gps.lat)/180*100).toFixed(1);
+        gpsHTML=`<div class="panel" style="margin-bottom:14px"><div class="panel-h"><div><div class="t">GPS coordinates recovered</div></div><span class="pill crit"><span class="d"></span>Location leak</span></div>
+          <div class="map-strip"><div class="grid-ln"></div><div class="pin"><div class="ring" style="left:${leftPct}%;top:${topPct}%"></div></div><div class="co">${r.gps.lat}° , ${r.gps.lon}°</div></div></div>`;
+      }
+      const meta=r.exif||r.document||{};
+      const rows=Object.entries(meta).map(([k,v])=>`<div class="rec"><span class="rk">${esc(k)}</span><span class="rv">${esc(v)}</span><span class="rt"></span></div>`).join("")||`<div class="empty">${esc(r.note||"No embedded metadata found.")}</div>`;
+      document.getElementById("modOut").innerHTML=gpsHTML+`
+        <div class="grid g-2">
+          <div class="panel"><div class="panel-h"><div><div class="t">${esc(r.filename)}</div><div class="s">${(r.size_bytes/1024).toFixed(1)} KB · ${esc(r.kind)}</div></div></div><div class="panel-b" style="padding-top:6px">${rows}</div></div>
+          <div class="panel"><div class="panel-h"><div><div class="t">File fingerprint</div></div></div><div class="panel-b"><div class="rec"><span class="rk">SHA-256</span><span class="rv">${esc(r.sha256)}</span></div><div class="rec"><span class="rk">MD5</span><span class="rv">${esc(r.md5)}</span></div><div class="rec"><span class="rk">Size</span><span class="rv">${r.size_bytes.toLocaleString()} bytes</span></div>${r.dimensions?`<div class="rec"><span class="rk">Dimensions</span><span class="rv">${esc(r.dimensions)}</span></div>`:""}</div></div>
+        </div>`;
+    }catch(ex){ document.getElementById("modOut").innerHTML=keyNotice(esc(ex.message)); }
+  }
+};
+
+/* ---------- Archive ---------- */
+VIEWS.archive=function(){
+  C().innerHTML=pageHead("Archive &amp; history","","Recover prior states from the Internet Archive (Wayback Machine) — deleted pages, changed ownership, timelines.")
+    +scanForm("","e.g. example.com","Fetch captures")+`<div id="modOut"></div>`;
+  bindCaseSelect();
+  const run=async()=>{
+    const url=document.getElementById("modInput").value.trim(); if(!url) return;
+    document.getElementById("modOut").innerHTML=loadingHTML("Querying Wayback Machine…");
+    try{
+      const r=await api("/scan/archive",{method:"POST",body:{url:url,case_id:ACTIVE_CASE}});
+      if(!r.total){ document.getElementById("modOut").innerHTML=`<div class="panel"><div class="empty">No archived captures found for this URL.</div></div>`; return; }
+      const years=Object.entries(r.per_year); const maxY=Math.max(...years.map(([,v])=>v),1);
+      const bars=years.reverse().map(([y,v])=>`<div class="sev-row" style="grid-template-columns:44px 1fr 34px"><span class="k mono">${esc(y)}</span><span class="sev-track"><span class="sev-fill" style="width:${Math.round(v/maxY*100)}%;background:var(--accent)"></span></span><span class="v">${v}</span></div>`).join("");
+      const tl=(r.recent||[]).map(c=>`<div class="tnode"><div class="dt">${esc(c.date)}</div><div class="tt"><a href="${esc(c.wayback)}" target="_blank" rel="noopener">${esc(c.original)}</a></div></div>`).join("");
+      document.getElementById("modOut").innerHTML=`
+        <div class="scanbar" style="margin-bottom:14px"><span class="chip"><b style="color:var(--accent)">${r.total}</b>&nbsp;captures</span><span class="chip">first ${esc(r.first_capture||"—")}</span><span class="chip">last ${esc(r.last_capture||"—")}</span></div>
+        <div class="grid g-2-1">
+          <div class="panel"><div class="panel-h"><div><div class="t">Recent captures — ${esc(r.selector)}</div></div></div><div class="panel-b"><div class="tline">${tl}</div></div></div>
+          <div class="panel"><div class="panel-h"><div><div class="t">Snapshot density</div><div class="s">captures per year</div></div></div><div class="panel-b"><div class="sev">${bars}</div></div></div>
+        </div>`;
+    }catch(ex){ document.getElementById("modOut").innerHTML=keyNotice(esc(ex.message)); }
+  };
+  document.getElementById("runBtn").addEventListener("click",run);
+  document.getElementById("modInput").addEventListener("keydown",e=>{if(e.key==="Enter")run();});
+};
+
+/* ---------- Web search ---------- */
+VIEWS.websearch=function(){
+  C().innerHTML=pageHead("Web search","","Advanced query builder (exact phrase · site · filetype · date range · exclude) against DuckDuckGo, plus site-index inspection.")+`
+    <div class="panel" style="margin-bottom:14px"><div class="panel-b"><div class="form-grid">
+      <div class="fld"><label>Keywords</label><input id="wsKw" placeholder="e.g. data breach"></div>
+      <div class="fld"><label>Exact phrase</label><input id="wsPh" placeholder="optional — matched verbatim"></div>
+      <div class="fld"><label>Site(s) — comma separated</label><input id="wsSites" placeholder="github.com, gov.uk"></div>
+      <div class="fld"><label>File type</label><input id="wsFt" placeholder="pdf · xlsx · docx"></div>
+      <div class="fld"><label>Date from</label><input id="wsFrom" type="date"></div>
+      <div class="fld"><label>Date to</label><input id="wsTo" type="date"></div>
+    </div><div style="margin-top:14px;display:flex;gap:10px"><button class="tb-btn primary" id="wsRun">Search</button><button class="tb-btn" id="wsIdx">Inspect site index</button></div></div></div>
+    <div id="modOut"></div>`;
+  bindCaseSelect();
+  const body=()=>({keywords:wsKw.value.trim(),exact_phrase:wsPh.value.trim()||null,
+    sites:wsSites.value.split(",").map(s=>s.trim()).filter(Boolean),
+    filetype:wsFt.value.trim()||null,date_from:wsFrom.value||null,date_to:wsTo.value||null});
+  document.getElementById("wsRun").addEventListener("click",async()=>{
+    document.getElementById("modOut").innerHTML=loadingHTML("Searching…");
+    try{
+      const r=await api("/scan/websearch",{method:"POST",body:body()});
+      const rows=(r.results||[]).map(x=>`<div class="rec" style="grid-template-columns:1fr"><div><div style="color:var(--tx-1);font-weight:600;font-size:13px"><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title||x.url)}</a></div><div class="mono" style="font-size:10.5px;color:var(--tx-3)">${esc(x.url)}</div><div style="color:var(--tx-2);font-size:12px;margin-top:3px">${esc(x.snippet||"")}</div></div></div>`).join("")||`<div class="empty">No instant-answer results. DuckDuckGo's keyless API is limited — the query string below is ready for any engine.</div>`;
+      document.getElementById("modOut").innerHTML=`<div class="panel"><div class="panel-h"><div><div class="t">Results</div><div class="s mono">${esc(r.query)}</div></div></div><div class="panel-b" style="padding-top:6px">${rows}</div></div>`;
+    }catch(ex){ document.getElementById("modOut").innerHTML=keyNotice(esc(ex.message)); }
+  });
+  document.getElementById("wsIdx").addEventListener("click",async()=>{
+    const d=wsSites.value.split(",")[0].trim()||wsKw.value.trim();
+    if(!d){ toast("Enter a domain in the Site(s) field first",true); return; }
+    document.getElementById("modOut").innerHTML=loadingHTML("Reading sitemap + robots.txt…");
+    try{
+      const r=await api("/scan/siteindex",{method:"POST",body:{domain:d}});
+      const urls=(r.sitemap_urls||[]).map(u=>`<div class="rec" style="grid-template-columns:1fr"><span class="rv" style="font-size:11.5px">${esc(u)}</span></div>`).join("")||`<div class="empty">No sitemap.xml found.</div>`;
+      const rob=r.robots||{};
+      document.getElementById("modOut").innerHTML=`<div class="grid g-2-1">
+        <div class="panel"><div class="panel-h"><div><div class="t">Sitemap URLs</div><div class="s">${r.sitemap_count} entries</div></div></div><div class="panel-b" style="padding-top:6px;max-height:420px;overflow:auto">${urls}</div></div>
+        <div class="panel"><div class="panel-h"><div><div class="t">robots.txt</div></div></div><div class="panel-b"><div class="field-lbl">Disallow</div>${(rob.disallow||[]).map(x=>`<div class="mono" style="font-size:11.5px;color:var(--tx-2)">${esc(x)}</div>`).join("")||'<div class="empty">none</div>'}</div></div></div>`;
+    }catch(ex){ document.getElementById("modOut").innerHTML=keyNotice(esc(ex.message)); }
+  });
+};
+
+/* ---------- Cases ---------- */
+async function refreshCases(){
+  try{ CASES=await api("/cases"); document.getElementById("navCases").textContent=CASES.length; }catch(e){ CASES=[]; }
+}
+VIEWS.cases=async function(){
+  C().innerHTML=`<div class="pagehead"><div><div class="h">Cases</div><p>Group findings into investigations. Select a case as "active" in any module to log results to it automatically.</p></div>
+    <button class="tb-btn primary" id="newCaseBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New case</button></div>
+    <div class="panel" id="newCaseForm" hidden><div class="panel-b"><div class="form-grid">
+      <div class="fld"><label>Case name</label><input id="ncName" placeholder="e.g. Corp-Mail investigation"></div>
+      <div class="fld"><label>Primary target</label><input id="ncTarget" placeholder="e.g. corp-mail.io"></div>
+      <div class="fld"><label>Priority</label><select id="ncPri"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>
+      <div class="fld"><label>Notes</label><textarea id="ncNotes" placeholder="Scope, context, authorization…"></textarea></div>
+    </div><div style="margin-top:14px"><button class="tb-btn primary" id="ncSave">Create case</button></div></div></div>
+    <div id="caseList" style="margin-top:14px"></div>`;
+  await refreshCases();
+  renderCaseList();
+  document.getElementById("newCaseBtn").addEventListener("click",()=>{const f=document.getElementById("newCaseForm");f.hidden=!f.hidden;});
+  document.getElementById("ncSave").addEventListener("click",async()=>{
+    const name=document.getElementById("ncName").value.trim(); if(!name){toast("Case name required",true);return;}
+    try{
+      await api("/cases",{method:"POST",body:{name,target:ncTarget.value.trim(),priority:ncPri.value,notes:ncNotes.value.trim()}});
+      toast("Case created"); await refreshCases(); route("cases");
+    }catch(ex){ toast(ex.message,true); }
+  });
+};
+function renderCaseList(){
+  const rows=CASES.map(c=>`<tr>
+    <td><div class="ent"><div><div class="nm">${esc(c.name)}</div><div class="sq">${esc(c.id)}</div></div></div></td>
+    <td class="mono" style="color:var(--tx-2)">${esc(c.target||"—")}</td>
+    <td>${sevPill(c.priority)}</td>
+    <td><span class="pill ${c.status==="active"?"ok":"mut"}"><span class="d"></span>${esc(c.status)}</span></td>
+    <td class="num">${c.findings_count}</td>
+    <td style="text-align:right"><button class="tb-btn" data-report="${c.id}">Report</button> <button class="tb-btn" data-del="${c.id}">Delete</button></td></tr>`).join("");
+  document.getElementById("caseList").innerHTML=`<div class="panel"><div class="tbl-wrap"><table>
+    <thead><tr><th>Case</th><th>Target</th><th>Priority</th><th>Status</th><th>Findings</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="6"><div class="empty">No cases yet — create one to start logging findings.</div></td></tr>'}</tbody></table></div></div>`;
+  document.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",async()=>{
+    if(!confirm("Delete this case and its findings?"))return;
+    try{ await api("/cases/"+b.dataset.del,{method:"DELETE"}); toast("Case deleted"); await refreshCases(); renderCaseList(); }catch(ex){toast(ex.message,true);}
+  }));
+  document.querySelectorAll("[data-report]").forEach(b=>b.addEventListener("click",()=>openReport(b.dataset.report)));
+}
+
+/* ---------- Reports ---------- */
+VIEWS.reports=async function(){
+  await refreshCases();
+  C().innerHTML=`<div class="pagehead"><div><div class="h">Reports &amp; export</div><p>Generate a shareable report for any case as PDF, HTML or JSON.</p></div></div>
+    <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Case</th><th>Target</th><th>Findings</th><th>Export</th></tr></thead>
+    <tbody>${CASES.map(c=>`<tr><td><div class="ent"><div><div class="nm">${esc(c.name)}</div><div class="sq">${esc(c.id)}</div></div></div></td>
+      <td class="mono" style="color:var(--tx-2)">${esc(c.target||"—")}</td><td class="num">${c.findings_count}</td>
+      <td><button class="tb-btn primary" data-pdf="${c.id}">PDF</button> <button class="tb-btn" data-html="${c.id}">HTML</button> <button class="tb-btn" data-json="${c.id}">JSON</button></td></tr>`).join("")||'<tr><td colspan="4"><div class="empty">No cases to report on.</div></td></tr>'}</tbody></table></div></div>`;
+  document.querySelectorAll("[data-pdf]").forEach(b=>b.addEventListener("click",()=>exportPDF(b.dataset.pdf)));
+  document.querySelectorAll("[data-html]").forEach(b=>b.addEventListener("click",()=>openReport(b.dataset.html)));
+  document.querySelectorAll("[data-json]").forEach(b=>b.addEventListener("click",()=>exportJSON(b.dataset.json)));
+};
+async function exportPDF(cid){
+  try{
+    const r=await fetch("/api/cases/"+cid+"/report?format=pdf",{headers:{Authorization:"Bearer "+TOKEN}});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(e.detail||("HTTP "+r.status)); }
+    const blob=await r.blob();
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=cid+"_report.pdf"; a.click();
+    toast("PDF generated");
+  }catch(ex){ toast(ex.message,true); }
+}
+async function openReport(cid){
+  try{
+    const r=await api("/cases/"+cid+"/report?format=html");
+    const w=window.open("","_blank"); w.document.write(r.html); w.document.close();
+  }catch(ex){ toast(ex.message,true); }
+}
+async function exportJSON(cid){
+  try{
+    const r=await api("/cases/"+cid+"/report?format=json");
+    const blob=new Blob([JSON.stringify(r,null,2)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=cid+"_report.json"; a.click();
+  }catch(ex){ toast(ex.message,true); }
+}
+
+/* ---------- Relationship graph ---------- */
+const NODE_COLORS={handle:"#33C1E3",email:"#E8883C",domain:"#3DBE6B",ip:"#E5484D",phone:"#B98BE8",
+  file:"#E0B341",url:"#8695AC",account:"#2AA9C9",subdomain:"#5FCF8E",breach:"#E5484D",
+  org:"#E0B341",host:"#8695AC",location:"#E85D9E",person:"#B98BE8",carrier:"#B98BE8",selector:"#9AA9C1"};
+VIEWS.graph=async function(){
+  await refreshCases();
+  C().innerHTML=`<div class="pagehead"><div><div class="h">Relationship graph</div><p>Link analysis over a case's findings — shared entities connect selectors automatically. Pick a case to render its graph.</p></div>
+    <div class="fld"><label>Case</label><select id="gCase" style="min-width:260px">${CASES.map(c=>`<option value="${c.id}">${esc(c.name)} (${c.findings_count})</option>`).join("")||'<option value="">no cases</option>'}</select></div></div>
+    <div class="panel"><div class="panel-h"><div><div class="t">Entity link graph</div><div class="s" id="gMeta">—</div></div><div id="gLegend" style="display:flex;gap:12px;flex-wrap:wrap"></div></div>
+      <div class="panel-b" style="padding:0"><canvas id="gCanvas" style="width:100%;height:520px;display:block;border-radius:0 0 12px 12px"></canvas></div></div>`;
+  const sel=document.getElementById("gCase");
+  if(sel) sel.addEventListener("change",()=>draw(sel.value));
+  if(CASES.length) draw(CASES[0].id); else document.getElementById("gCanvas").outerHTML=`<div class="empty" style="padding:60px">Create a case and log some findings first.</div>`;
+
+  async function draw(cid){
+    if(!cid) return;
+    const meta=document.getElementById("gMeta"); meta.textContent="loading…";
+    let g;
+    try{ g=await api("/cases/"+cid+"/graph"); }catch(ex){ meta.textContent=ex.message; return; }
+    meta.textContent=`${g.node_count} entities · ${g.edge_count} links`;
+    const types=[...new Set(g.nodes.map(n=>n.type))];
+    document.getElementById("gLegend").innerHTML=types.map(t=>`<span class="lg" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx-2)"><span style="width:9px;height:9px;border-radius:50%;background:${NODE_COLORS[t]||'#9AA9C1'}"></span>${esc(t)}</span>`).join("");
+    const cv=document.getElementById("gCanvas"); if(!cv) return;
+    const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=520;
+    cv.width=W*dpr; cv.height=H*dpr; const ctx=cv.getContext("2d"); ctx.scale(dpr,dpr);
+    if(!g.nodes.length){ ctx.fillStyle="#647289"; ctx.font="13px monospace"; ctx.textAlign="center"; ctx.fillText("No linkable entities in this case yet — run scans with this case active.",W/2,H/2); return; }
+    // init positions on a circle
+    const N=g.nodes, E=g.edges, idx={};
+    N.forEach((n,i)=>{ idx[n.id]=i; const a=i/N.length*Math.PI*2; n.x=W/2+Math.cos(a)*Math.min(W,H)*0.32; n.y=H/2+Math.sin(a)*Math.min(W,H)*0.32; n.vx=0; n.vy=0; });
+    // simple force layout
+    for(let it=0; it<160; it++){
+      for(let i=0;i<N.length;i++){ for(let j=i+1;j<N.length;j++){
+        let dx=N[i].x-N[j].x, dy=N[i].y-N[j].y, d2=dx*dx+dy*dy||0.01, d=Math.sqrt(d2);
+        let f=1600/d2; let fx=dx/d*f, fy=dy/d*f;
+        N[i].vx+=fx; N[i].vy+=fy; N[j].vx-=fx; N[j].vy-=fy;
+      }}
+      E.forEach(e=>{ const a=N[idx[e.source]],b=N[idx[e.target]]; if(!a||!b)return;
+        let dx=b.x-a.x, dy=b.y-a.y, d=Math.sqrt(dx*dx+dy*dy)||0.01, f=(d-90)*0.015;
+        let fx=dx/d*f, fy=dy/d*f; a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy; });
+      N.forEach(n=>{ n.vx+=(W/2-n.x)*0.002; n.vy+=(H/2-n.y)*0.002; n.x+=Math.max(-8,Math.min(8,n.vx)); n.y+=Math.max(-8,Math.min(8,n.vy)); n.vx*=0.85; n.vy*=0.85;
+        n.x=Math.max(24,Math.min(W-24,n.x)); n.y=Math.max(24,Math.min(H-24,n.y)); });
+    }
+    render();
+    function render(){
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle="rgba(139,149,172,.25)"; ctx.lineWidth=1;
+      E.forEach(e=>{ const a=N[idx[e.source]],b=N[idx[e.target]]; if(!a||!b)return; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); });
+      N.forEach(n=>{
+        const r=Math.min(16,6+n.degree*1.6), col=NODE_COLORS[n.type]||"#9AA9C1";
+        ctx.beginPath(); ctx.arc(n.x,n.y,r,0,Math.PI*2); ctx.fillStyle=col; ctx.globalAlpha=.9; ctx.fill(); ctx.globalAlpha=1;
+        ctx.lineWidth=2; ctx.strokeStyle="#0A0E17"; ctx.stroke();
+        ctx.fillStyle="#E8EEF7"; ctx.font="11px 'JetBrains Mono',monospace"; ctx.textAlign="center"; ctx.textBaseline="top";
+        const lbl=n.label.length>22?n.label.slice(0,21)+"…":n.label;
+        ctx.fillText(lbl,n.x,n.y+r+3);
+      });
+    }
+    // drag
+    let drag=null;
+    cv.onmousedown=ev=>{ const p=pos(ev); drag=N.find(n=>Math.hypot(n.x-p.x,n.y-p.y)<16)||null; };
+    cv.onmousemove=ev=>{ if(!drag)return; const p=pos(ev); drag.x=p.x; drag.y=p.y; render(); };
+    cv.onmouseup=cv.onmouseleave=()=>drag=null;
+    function pos(ev){ const r=cv.getBoundingClientRect(); return {x:ev.clientX-r.left,y:ev.clientY-r.top}; }
+  }
+};
+
+/* ---------- Users & Roles ---------- */
+const ROLE_PILL={superadmin:"crit",admin:"med",analyst:"ok",viewer:"mut"};
+VIEWS.users=async function(){
+  if(!can("users:view")){ C().innerHTML=pageHead("Users &amp; roles")+keyNotice("You don't have permission to view users."); return; }
+  C().innerHTML=pageHead("Users &amp; roles","","Manage accounts and their access level. Each role grants a fixed set of permissions shown in the matrix below.")+loadingHTML("Loading users…");
+  try{
+    const [users,matrix]=await Promise.all([api("/users"),can("roles:view")?api("/roles"):Promise.resolve(null)]);
+    const roleOpts=(matrix?matrix.roles:[{key:"analyst",label:"Analyst"},{key:"viewer",label:"Viewer"}]);
+    const canManage=can("users:manage"), canAdmins=can("users:manage_admins");
+    const pending=users.filter(u=>!u.active).length;
+    const rows=users.map(u=>{
+      const isElevated=(u.role==="admin"||u.role==="superadmin");
+      const editable=canManage && (!isElevated||canAdmins) && u.username!==USER.username;
+      const roleCell=editable
+        ? `<select data-role-for="${esc(u.username)}" class="mono" style="background:var(--ink);border:1px solid var(--line);border-radius:7px;padding:5px 8px;color:var(--tx-1);font-size:11.5px">${roleOpts.map(r=>`<option value="${r.key}" ${r.key===u.role?"selected":""} ${(r.key==="admin"||r.key==="superadmin")&&!canAdmins?"disabled":""}>${esc(r.label)}</option>`).join("")}</select>`
+        : `<span class="pill ${ROLE_PILL[u.role]||"mut"}"><span class="d"></span>${esc(u.role_label||u.role)}</span>`;
+      const statusPill=u.active?'<span class="pill ok"><span class="d"></span>active</span>':'<span class="pill low"><span class="d"></span>pending</span>';
+      const actBtn=editable?`<button class="tb-btn" data-active-for="${esc(u.username)}" data-active="${u.active?0:1}">${u.active?"Disable":"Approve"}</button>`:"";
+      const del=(editable)?`<button class="tb-btn" data-del-user="${esc(u.username)}">Delete</button>`:"";
+      return `<tr>
+        <td class="mono" style="color:var(--tx-1);font-weight:600">${esc(u.username)}${u.username===USER.username?' <span class="chip">you</span>':""}</td>
+        <td>${esc(u.full_name||"—")}</td>
+        <td class="mono" style="color:var(--tx-2)">${esc(u.email||"—")}</td>
+        <td>${roleCell}</td>
+        <td>${statusPill}</td>
+        <td style="text-align:right;white-space:nowrap">${actBtn} ${del}</td></tr>`;
+    }).join("");
+    const addForm=canManage?`<div class="panel-b" style="border-top:1px solid var(--line)"><div class="form-grid">
+        <div class="fld"><label>Full name</label><input id="nuFull" spellcheck="false"></div>
+        <div class="fld"><label>Email</label><input id="nuEmail" type="email" spellcheck="false"></div>
+        <div class="fld"><label>Username</label><input id="nuName" spellcheck="false"></div>
+        <div class="fld"><label>Password</label><input id="nuPass" type="password" placeholder="min 8, letters + digits"></div>
+        <div class="fld"><label>Role</label><select id="nuRole">${roleOpts.filter(r=>(r.key!=="admin"&&r.key!=="superadmin")||canAdmins).map(r=>`<option value="${r.key}">${esc(r.label)}</option>`).join("")}</select></div>
+      </div><button class="tb-btn primary" id="nuAdd" style="margin-top:12px">Create user</button></div>`:"";
+    let matrixHTML="";
+    if(matrix){
+      const head=`<tr><th>Permission</th>${matrix.roles.map(r=>`<th style="text-align:center">${esc(r.label)}</th>`).join("")}</tr>`;
+      const body=matrix.permissions.map(p=>`<tr><td>${esc(p.label)}<div class="mono" style="font-size:10px;color:var(--tx-3)">${esc(p.key)}</div></td>`
+        +matrix.roles.map(r=>`<td style="text-align:center">${r.permissions.indexOf(p.key)>=0?'<span style="color:var(--ok)">●</span>':'<span style="color:var(--tx-3)">–</span>'}</td>`).join("")+`</tr>`).join("");
+      matrixHTML=`<div class="panel" style="margin-top:14px"><div class="panel-h"><div><div class="t">Roles &amp; permissions matrix</div><div class="s">what each role can do</div></div></div>
+        <div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div></div>`;
+    }
+    C().innerHTML=pageHead("Users &amp; roles","","Manage accounts and their access level. Each role grants a fixed set of permissions shown in the matrix below.")+`
+      <div class="panel"><div class="panel-h"><div><div class="t">Accounts</div><div class="s">${users.length} users${pending?` · ${pending} pending approval`:""}</div></div>${pending?`<span class="pill low"><span class="d"></span>${pending} pending</span>`:""}</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${addForm}</div>${matrixHTML}`;
+    // wire
+    document.querySelectorAll("[data-role-for]").forEach(s=>s.addEventListener("change",async()=>{
+      try{ await api("/users/"+encodeURIComponent(s.dataset.roleFor)+"/role",{method:"PATCH",body:{role:s.value}}); toast("Role updated"); }
+      catch(ex){ toast(ex.message,true); route("users"); }
+    }));
+    document.querySelectorAll("[data-active-for]").forEach(b=>b.addEventListener("click",async()=>{
+      try{ await api("/users/"+encodeURIComponent(b.dataset.activeFor)+"/active",{method:"PATCH",body:{active:b.dataset.active==="1"}}); toast("Account updated"); route("users"); }
+      catch(ex){ toast(ex.message,true); }
+    }));
+    document.querySelectorAll("[data-del-user]").forEach(b=>b.addEventListener("click",async()=>{
+      if(!confirm("Delete user "+b.dataset.delUser+"?"))return;
+      try{ await api("/users/"+encodeURIComponent(b.dataset.delUser),{method:"DELETE"}); toast("User deleted"); route("users"); }
+      catch(ex){ toast(ex.message,true); }
+    }));
+    const add=document.getElementById("nuAdd");
+    if(add) add.addEventListener("click",async()=>{
+      const n=document.getElementById("nuName").value.trim(), p=document.getElementById("nuPass").value, r=document.getElementById("nuRole").value;
+      const fn=document.getElementById("nuFull").value.trim(), em=document.getElementById("nuEmail").value.trim();
+      if(!n||!p){ toast("Username and password required",true); return; }
+      try{ await api("/users",{method:"POST",body:{username:n,password:p,role:r,full_name:fn,email:em}}); toast("User created"); route("users"); }
+      catch(ex){ toast(ex.message,true); }
+    });
+  }catch(ex){ C().innerHTML=pageHead("Users &amp; roles")+keyNotice(esc(ex.message)); }
+};
+
+/* ---------- Audit log ---------- */
+VIEWS.audit=async function(){
+  if(!can("audit:view")){ C().innerHTML=pageHead("Audit log")+keyNotice("You don't have permission to view the audit log."); return; }
+  C().innerHTML=pageHead("Audit log","","Every sign-in, scan and administrative action is recorded with the user, time and source IP.")+loadingHTML("Loading activity…");
+  try{
+    const rows=await api("/audit?limit=300");
+    const stPill=s=>({ok:"ok",fail:"crit",blocked:"low"}[s]||"mut");
+    const body=rows.map(a=>`<tr>
+      <td class="mono" style="color:var(--tx-2);white-space:nowrap">${new Date(a.ts*1000).toLocaleString()}</td>
+      <td class="mono" style="color:var(--tx-1)">${esc(a.username)}</td>
+      <td><span class="chip">${esc(a.action)}</span></td>
+      <td style="color:var(--tx-2)">${esc(a.detail||"")}</td>
+      <td class="mono" style="color:var(--tx-3)">${esc(a.ip||"")}</td>
+      <td><span class="pill ${stPill(a.status)}"><span class="d"></span>${esc(a.status)}</span></td></tr>`).join("");
+    C().innerHTML=pageHead("Audit log","","Every sign-in, scan and administrative action is recorded with the user, time and source IP.")+`
+      <div class="panel"><div class="panel-h"><div><div class="t">Activity trail</div><div class="s">${rows.length} most recent events</div></div><span class="chip">newest first</span></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th><th>IP</th><th>Status</th></tr></thead>
+      <tbody>${body||'<tr><td colspan="6"><div class="empty">No activity recorded yet.</div></td></tr>'}</tbody></table></div></div>`;
+  }catch(ex){ C().innerHTML=pageHead("Audit log")+keyNotice(esc(ex.message)); }
+};
+
+/* ---------- Settings ---------- */
+VIEWS.settings=async function(){
+  if(!can("settings:manage")){ C().innerHTML=pageHead("Settings")+keyNotice("You don't have permission to manage settings."); return; }
+  C().innerHTML=pageHead("Settings","","Manage API keys, request behaviour and your password. Keys are stored server-side and never sent back in full.")+loadingHTML("Loading settings…");
+  try{
+    const s=await api("/settings");
+    C().innerHTML=pageHead("Settings","","Manage API keys, request behaviour and your password. User accounts live under Users &amp; roles.")+`
+      <div class="grid g-2" style="margin-bottom:14px">
+        <div class="panel"><div class="panel-h"><div><div class="t">API keys</div><div class="s">unlock the gated modules</div></div></div><div class="panel-b">
+          <div class="fld" style="margin-bottom:12px"><label>HaveIBeenPwned ${s.hibp_api_key_set?'· <span style="color:var(--ok)">set</span>':""}</label><input id="stHibp" placeholder="${s.hibp_api_key||"paste key to enable breach lookups"}"></div>
+          <div class="fld" style="margin-bottom:12px"><label>Shodan ${s.shodan_api_key_set?'· <span style="color:var(--ok)">set</span>':""}</label><input id="stShodan" placeholder="${s.shodan_api_key||"paste key to enable port scans"}"></div>
+          <div class="fld"><label>VirusTotal ${s.virustotal_api_key_set?'· <span style="color:var(--ok)">set</span>':""}</label><input id="stVt" placeholder="${s.virustotal_api_key||"paste key to enable reputation"}"></div>
+          <button class="tb-btn primary" id="stSaveKeys" style="margin-top:14px">Save keys</button>
+        </div></div>
+        <div class="panel"><div class="panel-h"><div><div class="t">Request behaviour</div></div></div><div class="panel-b">
+          <div class="fld" style="margin-bottom:12px"><label>HTTP proxy (optional)</label><input id="stProxy" value="${esc(s.http_proxy||"")}" placeholder="http://127.0.0.1:8080"></div>
+          <div class="fld" style="margin-bottom:12px"><label>Request timeout (seconds)</label><input id="stTimeout" type="number" value="${esc(s.request_timeout||12)}"></div>
+          <div class="fld"><label>User-Agent</label><input id="stUA" value="${esc(s.user_agent||"")}"></div>
+          <button class="tb-btn primary" id="stSaveBeh" style="margin-top:14px">Save behaviour</button>
+        </div></div>
+      </div>
+      <div class="panel"><div class="panel-h"><div><div class="t">Change my password</div><div class="s">signed in as ${esc(USER.username)} · ${esc(USER.role_label||USER.role)}</div></div></div><div class="panel-b">
+          <div class="fld" style="max-width:360px"><label>New password</label><input id="pwNew" type="password" placeholder="min 8 chars · letters + digits"></div>
+          <button class="tb-btn primary" id="pwSave" style="margin-top:14px">Update password</button></div></div>`;
+    document.getElementById("stSaveKeys").addEventListener("click",async()=>{
+      const body={}; const h=stHibp.value.trim(),sh=stShodan.value.trim(),vt=stVt.value.trim();
+      if(h)body.hibp_api_key=h; if(sh)body.shodan_api_key=sh; if(vt)body.virustotal_api_key=vt;
+      try{ await api("/settings",{method:"POST",body}); toast("API keys saved"); route("settings"); }catch(ex){toast(ex.message,true);}
+    });
+    document.getElementById("stSaveBeh").addEventListener("click",async()=>{
+      try{ await api("/settings",{method:"POST",body:{http_proxy:stProxy.value.trim(),request_timeout:parseInt(stTimeout.value)||12,user_agent:stUA.value.trim()}}); toast("Saved"); }catch(ex){toast(ex.message,true);}
+    });
+    document.getElementById("pwSave").addEventListener("click",async()=>{
+      if(pwNew.value.length<4){toast("Password too short",true);return;}
+      try{ await api("/auth/password",{method:"POST",body:{new_password:pwNew.value}}); toast("Password updated"); }catch(ex){toast(ex.message,true);}
+    });
+  }catch(ex){ C().innerHTML=pageHead("Settings")+keyNotice(esc(ex.message)); }
+};
+
+/* ============================ boot ============================ */
+(async function boot(){
+  if(TOKEN){
+    try{ USER=await api("/auth/me"); startApp(); }
+    catch(e){ logout(); }
+  }
+})();
+</script>
+</body>
+</html>

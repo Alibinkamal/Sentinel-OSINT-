@@ -1,0 +1,20 @@
+services:
+  sentinel:
+    build: .
+    image: sentinel-osint:latest
+    container_name: sentinel-osint
+    # Host port is configurable (PORT); the app inside always listens on 8000.
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      # persists the SQLite DB, settings.json and the JWT secret across rebuilds
+      - ./data:/app/data
+    # Keys are optional. Add them here in an .env file (copy .env.example -> .env)
+    # OR — simpler — from the in-app Settings screen after you log in.
+    environment:
+      PORT: "8000"
+      HIBP_API_KEY: "${HIBP_API_KEY:-}"
+      SHODAN_API_KEY: "${SHODAN_API_KEY:-}"
+      VIRUSTOTAL_API_KEY: "${VIRUSTOTAL_API_KEY:-}"
+      REQUEST_TIMEOUT: "${REQUEST_TIMEOUT:-12}"
+    restart: unless-stopped
