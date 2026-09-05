@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: sentinel-osint
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
